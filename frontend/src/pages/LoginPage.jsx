@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowRight, Eye, EyeOff, HeartHandshake, LockKeyhole, Mail } from "lucide-react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { canAccessPath, getDefaultRoute, useAuth } from "../context/AuthContext.jsx";
 
 export default function LoginPage() {
@@ -56,6 +56,7 @@ export default function LoginPage() {
             <button className="primary-button login-submit" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in securely"} <ArrowRight size={17} /></button>
           </form>
           <div className="login-security"><LockKeyhole size={15} /><span>Your session is protected with secure authentication.</span></div>
+          <div className="auth-switch">Don't have an account? <Link to="/register">Create one</Link></div>
         </div>
         <div className="login-copyright">© {new Date().getFullYear()} Human Charity Dignity Foundation</div>
       </div>
