@@ -1,12 +1,14 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BadgeCheck, ChevronRight, LayoutDashboard, LogOut, Menu, ShieldCheck, Users, X
+  BadgeCheck, ChevronRight, LayoutDashboard, LogOut, Menu, ShieldCheck, UserCheck, UserRound, Users, X
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 
 const links = [
   { to: "/", label: "Overview", icon: LayoutDashboard, permission: "users.view", end: true },
+  { to: "/member", label: "Member portal", icon: UserRound, permission: "profile.view_own" },
+  { to: "/members/approval", label: "Member approval", icon: UserCheck, permission: "membership.view" },
   { to: "/users", label: "User management", icon: Users, permission: "users.view" },
   { to: "/roles", label: "Roles", icon: ShieldCheck, permission: "roles.view" },
   { to: "/permissions", label: "Permissions", icon: BadgeCheck, permission: "permissions.view" }
@@ -16,6 +18,10 @@ export default function AppLayout() {
   const { user, logout, hasPermission } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const sectionTitle = location.pathname.startsWith("/member") && !location.pathname.startsWith("/members")
+    ? "Member Portal"
+    : "Administration";
 
   async function handleLogout() {
     await logout();
@@ -50,7 +56,7 @@ export default function AppLayout() {
       <div className="main-column">
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Open navigation"><Menu size={21} /></button>
-          <div className="breadcrumb"><span>HCDF</span><ChevronRight size={14} /><strong>Administration</strong></div>
+          <div className="breadcrumb"><span>HCDF</span><ChevronRight size={14} /><strong>{sectionTitle}</strong></div>
           <div className="topbar-user">
             <div className="avatar">{initials}</div>
             <div className="topbar-user-copy"><strong>{user?.fullName || "HCDF User"}</strong><span>{(user?.roles || []).map((role) => role.code).join(" · ")}</span></div>

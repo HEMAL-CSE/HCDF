@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import sequelize, { connectDatabase } from "./config/database.js";
 import authRoutes from "./modules/auth/auth.routes.js";
 import adminRoutes from "./modules/admin/admin.routes.js";
+import memberRoutes from "./modules/member/member.routes.js";
 
 const app = express();
 const parsedPort = Number(process.env.PORT || 5001);
@@ -62,6 +63,7 @@ app.get("/api/v1/health", async (_req, res) => {
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/admin", adminRoutes);
+app.use("/api/v1/member", memberRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({

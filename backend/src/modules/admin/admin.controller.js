@@ -295,6 +295,140 @@ export async function replaceUserRoles(req, res, next) {
   }
 }
 
+export async function listPendingMembers(req, res, next) {
+  try {
+    const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1));
+    const limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+    const q = String(req.query.q || "").trim().slice(0, 150);
+
+    const conditions = ["u.status = 'PENDING'"];
+    const replacements = { limit, offset };
+    if (q) {
+      const escapedQ = q.replace(/[\\%_]/g, "\\$&");
+      conditions.push("(u.full_name LIKE :q ESCAPE '\\\\' OR u.email LIKE :q ESCAPE '\\\\' OR u.phone LIKE :q ESCAPE '\\\\')");
+      replacements.q = `%${escapedQ}%`;
+    }
+    const where = `WHERE ${conditions.join(" AND ")}`;
+
+    const countRows = await sequelize.query(
+      `SELECT COUNT(*) AS total FROM users u ${where}`,
+      { replacements, type: QueryTypes.SELECT }
+    );
+    const members = await sequelize.query(
+      `SELECT
+         u.id, u.full_name, u.email, u.phone, u.status, u.created_at,
+         GROUP_CONCAT(DISTINCT r.code ORDER BY r.code SEPARATOR ',') AS role_codes,
+         GROUP_CONCAT(DISTINCT r.name ORDER BY r.code SEPARATOR ' | ') AS role_names
+       FROM users u
+       LEFT JOIN user_roles ur ON ur.user_id = u.id
+       LEFT JOIN roles r ON r.id = ur.role_id
+       ${where}
+       GROUP BY u.id
+       ORDER BY u.created_at ASC, u.id ASC
+       LIMIT :limit OFFSET :offset`,
+      { replacements, type: QueryTypes.SELECT }
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        items: members.map((m) => ({
+          ...m,
+          id: String(m.id),
+          role_codes: m.role_codes ? m.role_codes.split(",") : [],
+          role_names: m.role_names ? m.role_names.split(" | ") : []
+        })),
+        pagination: {
+          page, limit, total: Number(countRows[0]?.total || 0),
+          total_pages: Math.ceil(Number(countRows[0]?.total || 0) / limit)
+        }
+      }
+    });
+  } catch (error) { return next(error); }
+}
+
+export async function approveMember(req, res, next) {
+  const transaction = await sequelize.transaction();
+  try {
+    const id = parseId(req.params.id);
+    if (!id) { await transaction.rollback(); return sendError(res, 422, "INVALID_USER_ID", "Invalid user ID."); }
+    if (String(req.auth.userId) === id) {
+      await transaction.rollback();
+      return sendError(res, 409, "SELF_APPROVAL_BLOCKED", "You cannot approve your own account.");
+    }
+
+    const target = await sequelize.query(
+      `SELECT id, status, full_name, email FROM users WHERE id = :id FOR UPDATE`,
+      { replacements: { id }, type: QueryTypes.SELECT, transaction }
+    );
+    if (!target.length) { await transaction.rollback(); return sendError(res, 404, "USER_NOT_FOUND", "User was not found."); }
+    if (target[0].status !== "PENDING") {
+      await transaction.rollback();
+      return sendError(res, 409, "NOT_PENDING", "Only accounts with PENDING status can be approved.");
+    }
+
+    await sequelize.query(
+      `UPDATE users SET status = 'ACTIVE', failed_login_attempts = 0, locked_until = NULL, updated_at = NOW() WHERE id = :id`,
+      { replacements: { id }, transaction }
+    );
+    await transaction.commit();
+
+    return res.json({
+      success: true,
+      message: "Member account approved and activated.",
+      data: { user_id: id, full_name: target[0].full_name, status: "ACTIVE" }
+    });
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    return next(error);
+  }
+}
+
+export async function rejectMember(req, res, next) {
+  const transaction = await sequelize.transaction();
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const id = parseId(req.params.id);
+    const reason = String(body.reason ?? "").trim().slice(0, 500) || null;
+    if (!id) { await transaction.rollback(); return sendError(res, 422, "INVALID_USER_ID", "Invalid user ID."); }
+    if (String(req.auth.userId) === id) {
+      await transaction.rollback();
+      return sendError(res, 409, "SELF_REJECTION_BLOCKED", "You cannot reject your own account.");
+    }
+
+    const target = await sequelize.query(
+      `SELECT id, status, full_name FROM users WHERE id = :id FOR UPDATE`,
+      { replacements: { id }, type: QueryTypes.SELECT, transaction }
+    );
+    if (!target.length) { await transaction.rollback(); return sendError(res, 404, "USER_NOT_FOUND", "User was not found."); }
+    if (target[0].status !== "PENDING") {
+      await transaction.rollback();
+      return sendError(res, 409, "NOT_PENDING", "Only accounts with PENDING status can be rejected.");
+    }
+
+    await sequelize.query(
+      `UPDATE users SET status = 'SUSPENDED', updated_at = NOW() WHERE id = :id`,
+      { replacements: { id }, transaction }
+    );
+    await sequelize.query(
+      `UPDATE auth_sessions SET revoked_at = NOW(), updated_at = NOW()
+       WHERE user_id = :id AND revoked_at IS NULL`,
+      { replacements: { id }, transaction }
+    );
+    await transaction.commit();
+
+    return res.json({
+      success: true,
+      message: "Member application rejected.",
+      data: { user_id: id, full_name: target[0].full_name, status: "SUSPENDED", reason }
+    });
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    return next(error);
+  }
+}
+
 export async function listRoles(req, res, next) {
   try {
     const roles = await sequelize.query(

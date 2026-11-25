@@ -5,8 +5,10 @@ const AuthContext = createContext(null);
 
 const routePermissions = [
   { path: "/", permission: "users.view" },
+  { path: "/members/approval", permission: "membership.view" },
   { path: "/roles", permission: "roles.view" },
-  { path: "/permissions", permission: "permissions.view" }
+  { path: "/permissions", permission: "permissions.view" },
+  { path: "/member", permission: "profile.view_own" }
 ];
 
 export function getDefaultRoute(user) {
@@ -18,8 +20,10 @@ export function getDefaultRoute(user) {
 export function canAccessPath(user, pathname) {
   const permissions = user?.permissions || [];
   if (pathname === "/" || pathname === "/users") return permissions.includes("users.view");
+  if (pathname === "/members/approval") return permissions.includes("membership.view");
   if (pathname === "/roles") return permissions.includes("roles.view");
   if (pathname === "/permissions") return permissions.includes("permissions.view");
+  if (pathname === "/member") return permissions.includes("profile.view_own");
   return false;
 }
 

@@ -1,13 +1,16 @@
 import { Router } from "express";
 import { authenticate, requirePermission } from "../../middlewares/auth.middleware.js";
 import {
+  approveMember,
   dashboardSummary,
   getRolePermissions,
   getUser,
   getUserRoles,
+  listPendingMembers,
   listPermissions,
   listRoles,
   listUsers,
+  rejectMember,
   replaceRolePermissions,
   replaceUserRoles,
   updateUserStatus
@@ -18,6 +21,10 @@ const router = Router();
 router.use(authenticate);
 
 router.get("/dashboard/summary", requirePermission("users.view"), dashboardSummary);
+
+router.get("/members/pending", requirePermission("membership.view"), listPendingMembers);
+router.patch("/members/:id/approve", requirePermission("membership.approve"), approveMember);
+router.patch("/members/:id/reject", requirePermission("membership.approve"), rejectMember);
 
 router.get("/users", requirePermission("users.view"), listUsers);
 router.get("/users/:id", requirePermission("users.view"), getUser);

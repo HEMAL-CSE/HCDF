@@ -128,6 +128,7 @@ export default function RegisterPage() {
                 <button className="primary-button login-submit" type="submit" disabled={busy}>{busy ? "Submitting…" : "Create account"} <ArrowRight size={17} /></button>
               </form>
               <div className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></div>
+              <div className="auth-switch" style={{ marginTop: 8 }}><Link to="/home">← Back to home</Link></div>
             </>
           )}
         </div>

@@ -57,6 +57,8 @@ export default function LoginPage() {
           </form>
           <div className="login-security"><LockKeyhole size={15} /><span>Your session is protected with secure authentication.</span></div>
           <div className="auth-switch">Don't have an account? <Link to="/register">Create one</Link></div>
+          <div className="auth-switch" style={{ marginTop: 8 }}>Are you a member? <Link to="/member/login">Member login panel</Link></div>
+          <div className="auth-switch" style={{ marginTop: 8 }}><Link to="/home">← Back to home</Link></div>
         </div>
         <div className="login-copyright">© {new Date().getFullYear()} Human Charity Dignity Foundation</div>
       </div>
