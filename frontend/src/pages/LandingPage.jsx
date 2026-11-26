@@ -1,192 +1,260 @@
-import { ArrowRight, HeartHandshake, ShieldCheck, UserRound, Users, Globe, Gift, UsersRound } from "lucide-react";
-import { Link, Navigate } from "react-router-dom";
-import { getDefaultRoute, useAuth } from "../context/AuthContext.jsx";
-
-// ==== Data ==== //
-const programmes = [
-  {
-    icon: <HeartHandshake size={28} />,
-    title: "Humanitarian Aid",
-    desc: "Emergency relief – food, shelter and medical support for families in crisis.",
-  },
-  {
-    icon: <Users size={28} />,
-    title: "Community Development",
-    desc: "Long‑term education, skills training and livelihood projects.",
-  },
-  {
-    icon: <ShieldCheck size={28} />,
-    title: "Dignity & Rights",
-    desc: "Advocacy and legal aid for marginalised groups.",
-  },
-];
-
-const impactCards = [
-  {
-    icon: <Globe size={24} />,
-    title: "Global Reach",
-    desc: "Operating in 12 countries, helping over 5,000 beneficiaries.",
-  },
-  {
-    icon: <Gift size={24} />,
-    title: "Volunteer Power",
-    desc: "1,200 active volunteers delivering programmes on the ground.",
-  },
-  {
-    icon: <UsersRound size={24} />,
-    title: "Transparent Funding",
-    desc: "100 % of donations are tracked and reported.",
-  },
-];
-
-const stats = [
-  { value: "5,000+", label: "Members Served" },
-  { value: "12", label: "Active Programmes" },
-  { value: "8", label: "Partner Organisations" },
-  { value: "100%", label: "Transparency" },
-];
+import { useEffect, useState } from "react";
+import {
+  ArrowRight, Award, ChevronLeft, ChevronRight, HeartHandshake,
+  ShieldCheck, UserRound
+} from "lucide-react";
+import { Link, useOutletContext } from "react-router-dom";
+import { resolveMediaUrl } from "../api/client.js";
+import { DynamicIcon, FALLBACK_HOME, SmartActionLink } from "../utils/publicHome.jsx";
 
 export default function LandingPage() {
-  const { user, loading } = useAuth();
+  const { homeData, copy } = useOutletContext();
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
 
-  if (loading) return <div className="page-loading">Loading…</div>;
-  if (user) return <Navigate to={getDefaultRoute(user)} replace />;
+  const banners = homeData?.banners?.length ? homeData.banners : FALLBACK_HOME.banners;
+  const aboutData = homeData?.about?.[0] || FALLBACK_HOME.about[0];
+  const programmes = homeData?.programmes?.length ? homeData.programmes : FALLBACK_HOME.programmes;
+  const impact = homeData?.impact?.length ? homeData.impact : FALLBACK_HOME.impact;
+  const totalSlides = banners.length;
+
+  useEffect(() => {
+    setSlideIndex(0);
+  }, [totalSlides]);
+
+  useEffect(() => {
+    if (paused || totalSlides <= 1) return undefined;
+    const timer = setInterval(() => {
+      setSlideIndex((prev) => (prev + 1) % totalSlides);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, [paused, totalSlides]);
+
+  const activeSlide = banners[slideIndex % totalSlides] || banners[0];
+  const isSideBySide = activeSlide?.layoutType === "SIDE_BY_SIDE";
 
   return (
-    <div className="landing-root">
-      {/* ── TOP NAVIGATION ───────────────────── */}
-      <header className="landing-nav">
-        <div className="landing-nav-inner">
-          <div className="landing-nav-brand">
-            <div className="brand-mark">H</div>
-            <span className="landing-nav-name">HCDF</span>
-          </div>
-          <nav className="landing-nav-links">
-            <Link to="/register" className="landing-nav-link">Register</Link>
-            <Link to="/member/login" className="landing-nav-link">Member Login</Link>
-            <Link to="/login" className="landing-nav-btn">Staff Sign In <ArrowRight size={15} /></Link>
-          </nav>
-        </div>
-      </header>
-
-      {/* ── NEWS TICKER ───────────────────────────── */}
-      <div className="landing-ticker" aria-label="Latest news and updates">
-        <span className="ticker-badge">Live Updates</span>
-        <div className="ticker-content">
-          <span className="ticker-item">Welcome new volunteers to HCDF – thank you for joining our mission! &nbsp;•&nbsp;</span>
-          <span className="ticker-item">Upcoming community outreach event – sign up to make a difference. &nbsp;•&nbsp;</span>
-          <span className="ticker-item">Transparent funding: 100% of donations are tracked and reported. &nbsp;•&nbsp;</span>
-          <span className="ticker-item">Join our Member portal for personalized updates and resources. &nbsp;•&nbsp;</span>
-        </div>
-      </div>
-
-
-
-      {/* ── HERO SECTION ─────────────────────── */}
-      <section className="landing-hero">
+    <>
+      {/* ── HERO BANNER SLIDER ────────────────────────────────────── */}
+      <section
+        className={`hcdf-hero-slider ${isSideBySide ? "hcdf-hero-side-mode" : ""}`}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        {!isSideBySide && activeSlide?.imageUrl && (
+          <div
+            className="hcdf-hero-bg-image"
+            style={{ backgroundImage: `url(${resolveMediaUrl(activeSlide.imageUrl)})` }}
+          />
+        )}
+        <div className="hcdf-hero-overlay" />
         <div className="landing-hero-bg-orb orb-one" />
         <div className="landing-hero-bg-orb orb-two" />
-        <div className="landing-hero-content">
-          <div className="eyebrow light-eyebrow"><span /> HUMAN CHARITY DIGNITY FOUNDATION</div>
-          <h1 className="landing-hero-h1">
-            Purposeful work.<br /><em>Meaningful impact.</em>
-          </h1>
-          <p className="landing-hero-sub">
-            Serving people with dignity and compassion – connecting members, staff and volunteers around a shared mission.
-          </p>
-          <div className="landing-cta-group">
-            <Link to="/member/login" className="primary-button landing-cta-primary">
-              <UserRound size={18} /> Member Login <ArrowRight size={17} />
-            </Link>
-            <Link to="/register" className="landing-cta-secondary">Register as Member</Link>
+
+        <div className="hcdf-container hcdf-hero-inner">
+          <div className={isSideBySide ? "hcdf-hero-split" : "hcdf-hero-single"}>
+            <div className="hcdf-hero-copy">
+              <div className="eyebrow light-eyebrow"><span /> HUMAN CHARITY DIGNITY FOUNDATION</div>
+              <h1 className="landing-hero-h1">{activeSlide?.title}</h1>
+              {activeSlide?.subtitle && (
+                <p className="landing-hero-sub">{activeSlide.subtitle}</p>
+              )}
+              <div className="landing-cta-group">
+                {activeSlide?.ctaLabel && activeSlide?.ctaLink ? (
+                  <SmartActionLink to={activeSlide.ctaLink} className="primary-button landing-cta-primary">
+                    {activeSlide.ctaLabel} <ArrowRight size={17} />
+                  </SmartActionLink>
+                ) : (
+                  <Link to="/register" className="primary-button landing-cta-primary">
+                    {copy.registerMember} <ArrowRight size={17} />
+                  </Link>
+                )}
+                <Link to="/member/login" className="landing-cta-secondary">
+                  <UserRound size={17} /> {copy.memberPortal}
+                </Link>
+              </div>
+            </div>
+
+            {isSideBySide && (
+              <div className="hcdf-hero-media">
+                {activeSlide?.imageUrl ? (
+                  <img
+                    src={resolveMediaUrl(activeSlide.imageUrl)}
+                    alt={activeSlide.title}
+                    className="hcdf-hero-side-img"
+                  />
+                ) : (
+                  <div className="hcdf-hero-side-card">
+                    <HeartHandshake size={38} />
+                    <h3>{copy.brandFull}</h3>
+                    <p>{copy.footerAbout}</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
+
+        {totalSlides > 1 && (
+          <>
+            <button
+              type="button"
+              className="hcdf-slider-arrow prev"
+              aria-label="Previous slide"
+              onClick={() => setSlideIndex((prev) => (prev - 1 + totalSlides) % totalSlides)}
+            >
+              <ChevronLeft size={22} />
+            </button>
+            <button
+              type="button"
+              className="hcdf-slider-arrow next"
+              aria-label="Next slide"
+              onClick={() => setSlideIndex((prev) => (prev + 1) % totalSlides)}
+            >
+              <ChevronRight size={22} />
+            </button>
+            <div className="hcdf-slider-dots" role="tablist" aria-label="Banner slides">
+              {banners.map((b, idx) => (
+                <button
+                  key={b.id || idx}
+                  type="button"
+                  aria-label={`Go to slide ${idx + 1}`}
+                  className={`hcdf-slider-dot ${idx === slideIndex ? "active" : ""}`}
+                  onClick={() => setSlideIndex(idx)}
+                />
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
-      {/* ── STAT BAR ─────────────────────────── */}
-      <section className="landing-stats-bar">
-        {stats.map((s) => (
-          <div key={s.label} className="landing-stat">
-            <strong>{s.value}</strong>
-            <span>{s.label}</span>
-          </div>
-        ))}
-      </section>
-
-      {/* ── ABOUT SECTION ───────────────────── */}
-      <section id="about" className="landing-section">
-        <div className="landing-section-inner">
-          <div className="eyebrow">WHO WE ARE</div>
-          <h2 className="landing-section-h2">A foundation built on human dignity</h2>
-          <p className="landing-section-body">
-            The Human Charity Dignity Foundation (HCDF) exists to serve the most vulnerable members of our society – not just with material aid, but with respect, compassion and long‑term investment in their futures.
-          </p>
-        </div>
-      </section>
-
-      {/* ── PROGRAMMES SECTION ───────────────── */}
-      <section id="programmes" className="landing-section landing-section-alt">
-        <div className="landing-section-inner">
-          <div className="eyebrow">OUR PROGRAMMES</div>
-          <h2 className="landing-section-h2">How we make a difference</h2>
-          <div className="landing-cards">
-            {programmes.map((p) => (
-              <div key={p.title} className="landing-card">
-                <div className="landing-card-icon">{p.icon}</div>
-                <h3 className="landing-card-title">{p.title}</h3>
-                <p className="landing-card-desc">{p.desc}</p>
+      {/* ── IMPACT COUNTERS BAR (LIGHT SLATE BAND) ────────────────── */}
+      <section id="impact" className="hcdf-impact-wrap public-surface-soft">
+        <div className="hcdf-container">
+          <div className="hcdf-impact-grid">
+            {impact.map((item) => (
+              <div key={item.id} className="hcdf-impact-card">
+                <div className="hcdf-impact-icon">
+                  <DynamicIcon name={item.icon} size={22} />
+                </div>
+                <div className="hcdf-impact-meta">
+                  <strong>{item.metricValue || "—"}</strong>
+                  <span>{item.title}</span>
+                  {item.subtitle && <small>{item.subtitle}</small>}
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── IMPACT SECTION (new cards) ─────── */}
-      <section id="impact" className="landing-section">
-        <div className="landing-section-inner">
-          <div className="eyebrow">OUR IMPACT</div>
-          <h2 className="landing-section-h2">Numbers that matter</h2>
-          <div className="landing-cards">
-            {impactCards.map((c) => (
-              <div key={c.title} className="landing-card">
-                <div className="landing-card-icon">{c.icon}</div>
-                <h3 className="landing-card-title">{c.title}</h3>
-                <p className="landing-card-desc">{c.desc}</p>
+      {/* ── ABOUT HCDF SECTION (CRISP WHITE SURFACE) ──────────────── */}
+      <section id="about" className="landing-section public-surface-white">
+        <div className="hcdf-container hcdf-about-grid">
+          <div className="hcdf-about-text">
+            <div className="eyebrow">{aboutData.subtitle || "WHO WE ARE"}</div>
+            <h2 className="landing-section-h2">{aboutData.title}</h2>
+            <p className="landing-section-body">{aboutData.description}</p>
+            <div className="hcdf-pillars">
+              <div className="hcdf-pillar">
+                <ShieldCheck size={18} />
+                <div>
+                  <strong>Dignity First</strong>
+                  <span>Respectful, people-centred humanitarian service</span>
+                </div>
               </div>
+              <div className="hcdf-pillar">
+                <Award size={18} />
+                <div>
+                  <strong>100% Accountability</strong>
+                  <span>Role-governed operations &amp; transparent reporting</span>
+                </div>
+              </div>
+            </div>
+            <div className="hcdf-about-actions">
+              {aboutData.ctaLabel && aboutData.ctaLink && (
+                <SmartActionLink to={aboutData.ctaLink} className="primary-button hcdf-about-cta">
+                  {aboutData.ctaLabel} <ArrowRight size={16} />
+                </SmartActionLink>
+              )}
+              <Link to="/about" className="secondary-button">
+                {copy.navAbout} <ArrowRight size={15} />
+              </Link>
+            </div>
+          </div>
+
+          <div className="hcdf-about-visual">
+            {aboutData.imageUrl ? (
+              <img src={resolveMediaUrl(aboutData.imageUrl)} alt={aboutData.title} className="hcdf-about-img" />
+            ) : (
+              <div className="hcdf-mission-card">
+                <div className="hcdf-mission-badge">{aboutData.metricValue || "HCDF Mission"}</div>
+                <h3>Empowering Communities, Restoring Hope</h3>
+                <p>
+                  Every initiative—from emergency relief and student scholarships to community health—is
+                  delivered directly with local participation and verifiable oversight.
+                </p>
+                <div className="hcdf-mission-tags">
+                  <span>Humanitarian Relief</span>
+                  <span>Education</span>
+                  <span>Healthcare</span>
+                  <span>Social Dignity</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CORE PROGRAMMES SECTION (WARM SLATE SURFACE) ──────────── */}
+      <section id="programmes" className="landing-section public-surface-soft">
+        <div className="hcdf-container">
+          <div className="hcdf-section-head">
+            <div className="eyebrow">{copy.programmesEyebrow}</div>
+            <h2 className="landing-section-h2">{copy.programmesHeading}</h2>
+            <p className="hcdf-section-lead">{copy.programmesLead}</p>
+          </div>
+
+          <div className="hcdf-programmes-grid">
+            {programmes.map((prog, index) => (
+              <article key={prog.id} className={`hcdf-prog-card hcdf-prog-accent-${index % 4}`}>
+                <div className="hcdf-prog-top">
+                  <div className="landing-card-icon">
+                    <DynamicIcon name={prog.icon} size={24} />
+                  </div>
+                  {prog.subtitle && <span className="hcdf-prog-tag">{prog.subtitle}</span>}
+                </div>
+                <h3 className="landing-card-title">{prog.title}</h3>
+                <p className="landing-card-desc">{prog.description}</p>
+                {prog.ctaLabel && prog.ctaLink && (
+                  <SmartActionLink to={prog.ctaLink} className="hcdf-prog-link">
+                    {prog.ctaLabel} <ArrowRight size={14} />
+                  </SmartActionLink>
+                )}
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── JOIN CTA ─────────────────────────── */}
-      <section id="join" className="landing-join">
-        <div className="landing-join-inner">
-          <h2 className="landing-join-h2">Ready to get involved?</h2>
-          <p className="landing-join-sub">
-            Join HCDF as a member to access your profile, stay updated on programmes, and contribute to our mission.
-          </p>
+      {/* ── CALL TO ACTION / JOIN US (DEEP NAVY-TEAL CONTRAST) ─────── */}
+      <section id="join" className="landing-join hcdf-join-navy">
+        <div className="hcdf-container landing-join-inner">
+          <div className="eyebrow light-eyebrow" style={{ justifyContent: "center" }}>
+            <span /> {copy.joinEyebrow}
+          </div>
+          <h2 className="landing-join-h2">{copy.joinHeading}</h2>
+          <p className="landing-join-sub">{copy.joinSub}</p>
           <div className="landing-cta-group">
             <Link to="/register" className="primary-button landing-cta-primary landing-cta-invert">
-              Register as Member <ArrowRight size={17} />
+              {copy.registerMember} <ArrowRight size={17} />
             </Link>
-            <Link to="/member/login" className="landing-cta-ghost">Already a member? Sign in</Link>
+            <Link to="/member/login" className="landing-cta-ghost">
+              {copy.alreadyMember}
+            </Link>
           </div>
         </div>
       </section>
-
-      {/* ── FOOTER ─────────────────────────────── */}
-      <footer className="landing-footer">
-        <div className="landing-footer-brand">
-          <div className="brand-mark brand-mark-sm">H</div>
-          <span>Human Charity Dignity Foundation</span>
-        </div>
-        <div className="landing-footer-links">
-          <Link to="/member/login">Member Login</Link>
-          <Link to="/register">Register</Link>
-          <Link to="/login" className="landing-footer-staff">Staff / Admin Sign In</Link>
-        </div>
-        <p className="landing-footer-copy">© {new Date().getFullYear()} Human Charity Dignity Foundation. All rights reserved.</p>
-      </footer>
-    </div>
+    </>
   );
 }

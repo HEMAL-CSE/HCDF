@@ -69,3 +69,50 @@ Role.belongsToMany(User, {
   as: "users"
 });
 
+export const HomeHeroBanner = sequelize.define("HomeHeroBanner", {
+  id: { type: DataTypes.BIGINT.UNSIGNED, primaryKey: true, autoIncrement: true },
+  title: { type: DataTypes.STRING(200), allowNull: false },
+  subtitle: { type: DataTypes.TEXT, allowNull: true },
+  imageUrl: { type: DataTypes.STRING(500), allowNull: true, field: "image_url" },
+  ctaLabel: { type: DataTypes.STRING(80), allowNull: true, field: "cta_label" },
+  ctaLink: { type: DataTypes.STRING(255), allowNull: true, field: "cta_link" },
+  layoutType: {
+    type: DataTypes.ENUM("BACKGROUND", "SIDE_BY_SIDE"),
+    allowNull: false,
+    defaultValue: "BACKGROUND",
+    field: "layout_type"
+  },
+  sortOrder: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0, field: "sort_order" },
+  isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: "is_active" },
+  createdBy: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true, field: "created_by" },
+  updatedBy: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true, field: "updated_by" }
+}, { ...commonOptions, tableName: "home_hero_banners" });
+
+export const HomeContentItem = sequelize.define("HomeContentItem", {
+  id: { type: DataTypes.BIGINT.UNSIGNED, primaryKey: true, autoIncrement: true },
+  sectionType: {
+    type: DataTypes.ENUM("ABOUT", "PROGRAMME", "IMPACT", "TICKER"),
+    allowNull: false,
+    field: "section_type"
+  },
+  title: { type: DataTypes.STRING(255), allowNull: false },
+  subtitle: { type: DataTypes.STRING(255), allowNull: true },
+  description: { type: DataTypes.TEXT, allowNull: true },
+  metricValue: { type: DataTypes.STRING(60), allowNull: true, field: "metric_value" },
+  icon: { type: DataTypes.STRING(60), allowNull: true },
+  imageUrl: { type: DataTypes.STRING(500), allowNull: true, field: "image_url" },
+  ctaLabel: { type: DataTypes.STRING(80), allowNull: true, field: "cta_label" },
+  ctaLink: { type: DataTypes.STRING(255), allowNull: true, field: "cta_link" },
+  layoutType: {
+    type: DataTypes.ENUM("BACKGROUND", "SIDE_BY_SIDE"),
+    allowNull: false,
+    defaultValue: "BACKGROUND",
+    field: "layout_type"
+  },
+  sortOrder: { type: DataTypes.INTEGER.UNSIGNED, allowNull: false, defaultValue: 0, field: "sort_order" },
+  isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true, field: "is_active" },
+  createdBy: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true, field: "created_by" },
+  updatedBy: { type: DataTypes.BIGINT.UNSIGNED, allowNull: true, field: "updated_by" }
+}, { ...commonOptions, tableName: "home_content_items" });
+
+

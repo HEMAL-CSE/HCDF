@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 44" fill="none">
+  <rect x="2" y="4" width="36" height="36" rx="9" fill="#0EA5E9"/>
+  <path d="M10 15L14.5 29L20 18L25.5 29L30 15" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="46" y="21" fill="#F8FAFC" font-family="Manrope, Arial, sans-serif" font-size="14" font-weight="800" letter-spacing="0.4">WEB SOFT BD</text>
+  <text x="46" y="34" fill="#94A3B8" font-family="DM Sans, Arial, sans-serif" font-size="9.5" font-weight="600" letter-spacing="0.6">SYSTEMS &amp; SOLUTIONS</text>
+</svg>

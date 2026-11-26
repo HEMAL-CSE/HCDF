@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BadgeCheck, ChevronRight, LayoutDashboard, LogOut, Menu, ShieldCheck, UserCheck, UserRound, Users, X
+  BadgeCheck, ChevronRight, LayoutDashboard, LayoutTemplate, LogOut, Menu, ShieldCheck, UserCheck, UserRound, Users, X
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -9,13 +9,14 @@ const links = [
   { to: "/", label: "Overview", icon: LayoutDashboard, permission: "users.view", end: true },
   { to: "/member", label: "Member portal", icon: UserRound, permission: "profile.view_own" },
   { to: "/members/approval", label: "Member approval", icon: UserCheck, permission: "membership.view" },
+  { to: "/cms", label: "Home content", icon: LayoutTemplate, roles: ["SA", "AD"] },
   { to: "/users", label: "User management", icon: Users, permission: "users.view" },
   { to: "/roles", label: "Roles", icon: ShieldCheck, permission: "roles.view" },
   { to: "/permissions", label: "Permissions", icon: BadgeCheck, permission: "permissions.view" }
 ];
 
 export default function AppLayout() {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission, hasAnyRole } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -41,7 +42,9 @@ export default function AppLayout() {
         </div>
         <div className="sidebar-section-label">WORKSPACE</div>
         <nav className="side-nav">
-          {links.filter((link) => hasPermission(link.permission)).map(({ to, label, icon: Icon, end }) => (
+          {links
+            .filter((link) => (!link.permission || hasPermission(link.permission)) && (!link.roles || hasAnyRole(...link.roles)))
+            .map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-link ${isActive ? "nav-link-active" : ""}`}>
               <Icon size={18} strokeWidth={1.9} /><span>{label}</span><ChevronRight className="nav-chevron" size={15} />
             </NavLink>

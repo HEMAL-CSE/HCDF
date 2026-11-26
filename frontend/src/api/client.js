@@ -1,6 +1,13 @@
 import axios from "axios";
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5001/api/v1";
+export const API_ORIGIN = baseURL.replace(/\/api\/v1\/?$/, "");
+
+export function resolveMediaUrl(url) {
+  if (!url) return "";
+  if (url.startsWith("/uploads/")) return `${API_ORIGIN}${url}`;
+  return url;
+}
 
 export const api = axios.create({
   baseURL,

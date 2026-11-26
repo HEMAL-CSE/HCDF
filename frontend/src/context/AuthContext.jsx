@@ -19,8 +19,10 @@ export function getDefaultRoute(user) {
 
 export function canAccessPath(user, pathname) {
   const permissions = user?.permissions || [];
+  const roles = (user?.roles || []).map((role) => role.code);
   if (pathname === "/" || pathname === "/users") return permissions.includes("users.view");
   if (pathname === "/members/approval") return permissions.includes("membership.view");
+  if (pathname === "/cms") return roles.includes("SA") || roles.includes("AD");
   if (pathname === "/roles") return permissions.includes("roles.view");
   if (pathname === "/permissions") return permissions.includes("permissions.view");
   if (pathname === "/member") return permissions.includes("profile.view_own");
