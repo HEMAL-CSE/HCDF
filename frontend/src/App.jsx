@@ -4,6 +4,8 @@ import AppLayout from "./components/AppLayout.jsx";
 import PublicLayout from "./components/PublicLayout.jsx";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import AboutPage from "./pages/AboutPage.jsx";
+import AuditReportsPage from "./pages/AuditReportsPage.jsx";
+import FinancePage from "./pages/FinancePage.jsx";
 import ImpactPage from "./pages/ImpactPage.jsx";
 import JoinPage from "./pages/JoinPage.jsx";
 import LandingPage from "./pages/LandingPage.jsx";
@@ -39,9 +41,11 @@ export default function App() {
     <Route path="/register" element={<RegisterPage />} />
     <Route path="/forbidden" element={<ProtectedRoute><ForbiddenPage /></ProtectedRoute>} />
     <Route element={<SecureLayout />}>
-      <Route index element={<ProtectedRoute permission="users.view"><DashboardPage /></ProtectedRoute>} />
+      <Route index element={<ProtectedRoute staffOnly><DashboardPage /></ProtectedRoute>} />
       <Route path="member" element={<ProtectedRoute permission="profile.view_own"><MemberPortalPage /></ProtectedRoute>} />
       <Route path="members/approval" element={<ProtectedRoute permission="membership.view"><MemberApprovalPage /></ProtectedRoute>} />
+      <Route path="finance" element={<ProtectedRoute anyPermission={["finance.view", "donations.view"]}><FinancePage /></ProtectedRoute>} />
+      <Route path="audit" element={<ProtectedRoute anyPermission={["audit.view", "reports.view"]}><AuditReportsPage /></ProtectedRoute>} />
       <Route path="cms" element={<ProtectedRoute roles={["SA", "AD"]}><HomeContentPage /></ProtectedRoute>} />
       <Route path="users" element={<ProtectedRoute permission="users.view"><UsersPage /></ProtectedRoute>} />
       <Route path="roles" element={<ProtectedRoute permission="roles.view"><RolesPage /></ProtectedRoute>} />

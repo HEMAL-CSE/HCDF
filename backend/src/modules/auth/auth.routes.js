@@ -5,9 +5,12 @@ import { authenticate } from "../../middlewares/auth.middleware.js";
 
 const router = Router();
 
+const isProduction = process.env.NODE_ENV === "production";
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 10,
+  limit: isProduction ? 10 : 1000,
+  skip: () => !isProduction,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -19,7 +22,8 @@ const authLimiter = rateLimit({
 
 const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 60,
+  limit: isProduction ? 60 : 1000,
+  skip: () => !isProduction,
   standardHeaders: true,
   legacyHeaders: false,
   message: {

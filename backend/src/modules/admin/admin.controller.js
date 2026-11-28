@@ -1,8 +1,37 @@
+import argon2 from "argon2";
+import crypto from "node:crypto";
 import { QueryTypes } from "sequelize";
 import sequelize from "../../config/database.js";
 
+const passwordOptions = { type: argon2.argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1 };
 const allowedStatuses = new Set(["PENDING", "ACTIVE", "SUSPENDED", "LOCKED"]);
 const MAX_UINT64 = 18446744073709551615n;
+
+function validEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function generateStrongPassword(length = 14) {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const digits = "23456789";
+  const symbols = "!@#$%&*";
+  const all = upper + lower + digits + symbols;
+  const chars = [
+    upper[crypto.randomInt(upper.length)],
+    lower[crypto.randomInt(lower.length)],
+    digits[crypto.randomInt(digits.length)],
+    symbols[crypto.randomInt(symbols.length)]
+  ];
+  for (let i = chars.length; i < length; i += 1) {
+    chars.push(all[crypto.randomInt(all.length)]);
+  }
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = crypto.randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
 
 function parseId(value) {
   const id = String(value ?? "").trim();
@@ -514,6 +543,305 @@ export async function replaceRolePermissions(req, res, next) {
     }
     await transaction.commit();
     return res.json({ success: true, message: "Role permissions replaced.", data: { role_id: id, permissions } });
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    return next(error);
+  }
+}
+
+export async function createUser(req, res, next) {
+  const transaction = await sequelize.transaction();
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const fullName = String(body.full_name ?? "").trim();
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const phone = String(body.phone ?? "").trim() || null;
+    const requestedStatus = String(body.status ?? "ACTIVE").toUpperCase();
+    const roleIds = parseIdArray(body.role_ids);
+    const shouldGenerate = Boolean(body.generate_password) || !String(body.password ?? "").trim();
+    const plainPassword = shouldGenerate ? generateStrongPassword(14) : String(body.password ?? "");
+
+    if (!fullName || fullName.length > 150) {
+      await transaction.rollback();
+      return sendError(res, 422, "INVALID_FULL_NAME", "Full name is required and must not exceed 150 characters.");
+    }
+    if (!email || !validEmail(email) || email.length > 191) {
+      await transaction.rollback();
+      return sendError(res, 422, "INVALID_EMAIL", "A valid email address is required for staff/admin accounts.");
+    }
+    if (phone && phone.length > 30) {
+      await transaction.rollback();
+      return sendError(res, 422, "INVALID_PHONE", "Phone number must not exceed 30 characters.");
+    }
+    if (!allowedStatuses.has(requestedStatus)) {
+      await transaction.rollback();
+      return sendError(res, 422, "INVALID_STATUS", "Status must be PENDING, ACTIVE, SUSPENDED or LOCKED.");
+    }
+    if (!roleIds || roleIds.length === 0) {
+      await transaction.rollback();
+      return sendError(res, 422, "ROLE_REQUIRED", "Select at least one role for this user.");
+    }
+    if (plainPassword.length < 12 || plainPassword.length > 128) {
+      await transaction.rollback();
+      return sendError(res, 422, "INVALID_PASSWORD", "Password must contain 12 to 128 characters.");
+    }
+
+    const dupRows = await sequelize.query(
+      phone
+        ? "SELECT id FROM users WHERE email = :email OR phone = :phone LIMIT 1"
+        : "SELECT id FROM users WHERE email = :email LIMIT 1",
+      { replacements: { email, phone }, type: QueryTypes.SELECT, transaction }
+    );
+    if (dupRows.length) {
+      await transaction.rollback();
+      return sendError(res, 409, "USER_EXISTS", "An account already exists with this email or phone.");
+    }
+
+    const roles = await sequelize.query(
+      `SELECT id, code, name FROM roles WHERE id IN (${roleIds.map((_, i) => `:role${i}`).join(",")})`,
+      { replacements: Object.fromEntries(roleIds.map((v, i) => [`role${i}`, v])), type: QueryTypes.SELECT, transaction }
+    );
+    if (roles.length !== roleIds.length) {
+      await transaction.rollback();
+      return sendError(res, 422, "UNKNOWN_ROLE", "One or more selected roles do not exist.");
+    }
+
+    const passwordHash = await argon2.hash(plainPassword, passwordOptions);
+    const [insertedUserId] = await sequelize.query(
+      `INSERT INTO users (full_name, email, phone, password_hash, status, email_verified_at, failed_login_attempts, created_at, updated_at)
+       VALUES (:fullName, :email, :phone, :passwordHash, :status, ${requestedStatus === "ACTIVE" ? "NOW()" : "NULL"}, 0, NOW(), NOW())`,
+      {
+        replacements: { fullName, email, phone, passwordHash, status: requestedStatus },
+        type: QueryTypes.INSERT,
+        transaction
+      }
+    );
+
+    const newUserId = String(insertedUserId);
+    for (const role of roles) {
+      await sequelize.query(
+        `INSERT INTO user_roles (user_id, role_id, assigned_at, created_at, updated_at)
+         VALUES (:userId, :roleId, NOW(), NOW(), NOW())`,
+        { replacements: { userId: newUserId, roleId: role.id }, transaction }
+      );
+    }
+
+    await transaction.commit();
+    return res.status(201).json({
+      success: true,
+      message: "User account created successfully.",
+      data: {
+        user: {
+          id: newUserId,
+          full_name: fullName,
+          email,
+          phone,
+          status: requestedStatus,
+          roles
+        },
+        credentials: {
+          email,
+          password: plainPassword
+        }
+      }
+    });
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    return next(error);
+  }
+}
+
+export async function resetUserPassword(req, res, next) {
+  const transaction = await sequelize.transaction();
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const id = parseId(req.params.id);
+    if (!id) { await transaction.rollback(); return sendError(res, 422, "INVALID_USER_ID", "Invalid user ID."); }
+
+    const shouldGenerate = Boolean(body.generate_password) || !String(body.password ?? "").trim();
+    const plainPassword = shouldGenerate ? generateStrongPassword(14) : String(body.password ?? "");
+    if (plainPassword.length < 12 || plainPassword.length > 128) {
+      await transaction.rollback();
+      return sendError(res, 422, "INVALID_PASSWORD", "Password must contain 12 to 128 characters.");
+    }
+
+    const target = await sequelize.query(
+      "SELECT id, full_name, email FROM users WHERE id = :id FOR UPDATE",
+      { replacements: { id }, type: QueryTypes.SELECT, transaction }
+    );
+    if (!target.length) {
+      await transaction.rollback();
+      return sendError(res, 404, "USER_NOT_FOUND", "User was not found.");
+    }
+
+    const passwordHash = await argon2.hash(plainPassword, passwordOptions);
+    await sequelize.query(
+      `UPDATE users
+       SET password_hash = :passwordHash, failed_login_attempts = 0, locked_until = NULL, updated_at = NOW()
+       WHERE id = :id`,
+      { replacements: { id, passwordHash }, transaction }
+    );
+    await sequelize.query(
+      `UPDATE auth_sessions SET revoked_at = NOW(), updated_at = NOW()
+       WHERE user_id = :id AND revoked_at IS NULL`,
+      { replacements: { id }, transaction }
+    );
+
+    await transaction.commit();
+    return res.json({
+      success: true,
+      message: "Password reset successfully. Active sessions have been signed out.",
+      data: {
+        user_id: id,
+        email: target[0].email,
+        temporary_password: plainPassword
+      }
+    });
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    return next(error);
+  }
+}
+
+export async function createRole(req, res, next) {
+  const transaction = await sequelize.transaction();
+  try {
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const code = String(body.code ?? "").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "");
+    const name = String(body.name ?? "").trim();
+    const description = String(body.description ?? "").trim().slice(0, 500) || null;
+    const permissionIds = body.permission_ids !== undefined ? parseIdArray(body.permission_ids) : [];
+
+    if (!code || code.length < 2 || code.length > 30) {
+      await transaction.rollback();
+      return sendError(res, 422, "INVALID_ROLE_CODE", "Role code must be 2–30 uppercase letters, digits, or underscores.");
+    }
+    if (!name || name.length > 100) {
+      await transaction.rollback();
+      return sendError(res, 422, "INVALID_ROLE_NAME", "Role name is required and must not exceed 100 characters.");
+    }
+    if (permissionIds === null) {
+      await transaction.rollback();
+      return sendError(res, 422, "INVALID_PERMISSION_IDS", "permission_ids must be an array of positive integer IDs.");
+    }
+
+    const existing = await sequelize.query(
+      "SELECT id FROM roles WHERE code = :code LIMIT 1",
+      { replacements: { code }, type: QueryTypes.SELECT, transaction }
+    );
+    if (existing.length) {
+      await transaction.rollback();
+      return sendError(res, 409, "ROLE_EXISTS", `Role code '${code}' already exists.`);
+    }
+
+    const permissions = permissionIds.length
+      ? await sequelize.query(
+          `SELECT id, code FROM permissions WHERE id IN (${permissionIds.map((_, i) => `:p${i}`).join(",")})`,
+          { replacements: Object.fromEntries(permissionIds.map((v, i) => [`p${i}`, v])), type: QueryTypes.SELECT, transaction }
+        )
+      : [];
+    if (permissions.length !== permissionIds.length) {
+      await transaction.rollback();
+      return sendError(res, 422, "UNKNOWN_PERMISSION", "One or more permission IDs do not exist.");
+    }
+
+    const [roleId] = await sequelize.query(
+      `INSERT INTO roles (code, name, description, is_system, created_at, updated_at)
+       VALUES (:code, :name, :description, 0, NOW(), NOW())`,
+      { replacements: { code, name, description }, type: QueryTypes.INSERT, transaction }
+    );
+
+    for (const permission of permissions) {
+      await sequelize.query(
+        `INSERT INTO role_permissions (role_id, permission_id, created_at, updated_at)
+         VALUES (:roleId, :permissionId, NOW(), NOW())`,
+        { replacements: { roleId, permissionId: permission.id }, transaction }
+      );
+    }
+
+    await transaction.commit();
+    return res.status(201).json({
+      success: true,
+      message: "Custom role created.",
+      data: {
+        id: String(roleId),
+        code,
+        name,
+        description,
+        is_system: false,
+        user_count: 0,
+        permission_count: permissions.length
+      }
+    });
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    return next(error);
+  }
+}
+
+export async function updateRole(req, res, next) {
+  try {
+    const id = parseId(req.params.id);
+    if (!id) return sendError(res, 422, "INVALID_ROLE_ID", "Invalid role ID.");
+
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const name = String(body.name ?? "").trim();
+    const description = String(body.description ?? "").trim().slice(0, 500) || null;
+    if (!name || name.length > 100) {
+      return sendError(res, 422, "INVALID_ROLE_NAME", "Role name is required and must not exceed 100 characters.");
+    }
+
+    const roleRows = await sequelize.query(
+      "SELECT id, code, is_system FROM roles WHERE id = :id LIMIT 1",
+      { replacements: { id }, type: QueryTypes.SELECT }
+    );
+    if (!roleRows.length) return sendError(res, 404, "ROLE_NOT_FOUND", "Role was not found.");
+
+    await sequelize.query(
+      "UPDATE roles SET name = :name, description = :description, updated_at = NOW() WHERE id = :id",
+      { replacements: { id, name, description } }
+    );
+
+    return res.json({
+      success: true,
+      message: "Role updated.",
+      data: { id, code: roleRows[0].code, name, description, is_system: Boolean(roleRows[0].is_system) }
+    });
+  } catch (error) { return next(error); }
+}
+
+export async function deleteRole(req, res, next) {
+  const transaction = await sequelize.transaction();
+  try {
+    const id = parseId(req.params.id);
+    if (!id) { await transaction.rollback(); return sendError(res, 422, "INVALID_ROLE_ID", "Invalid role ID."); }
+
+    const roleRows = await sequelize.query(
+      "SELECT id, code, is_system FROM roles WHERE id = :id FOR UPDATE",
+      { replacements: { id }, type: QueryTypes.SELECT, transaction }
+    );
+    if (!roleRows.length) {
+      await transaction.rollback();
+      return sendError(res, 404, "ROLE_NOT_FOUND", "Role was not found.");
+    }
+    if (roleRows[0].is_system || roleRows[0].code === "SA") {
+      await transaction.rollback();
+      return sendError(res, 409, "SYSTEM_ROLE_PROTECTED", "System roles cannot be deleted.");
+    }
+
+    const assignedUsers = await sequelize.query(
+      "SELECT COUNT(*) AS total FROM user_roles WHERE role_id = :id",
+      { replacements: { id }, type: QueryTypes.SELECT, transaction }
+    );
+    if (Number(assignedUsers[0]?.total || 0) > 0) {
+      await transaction.rollback();
+      return sendError(res, 409, "ROLE_IN_USE", "Reassign users from this role before deleting it.");
+    }
+
+    await sequelize.query("DELETE FROM role_permissions WHERE role_id = :id", { replacements: { id }, transaction });
+    await sequelize.query("DELETE FROM roles WHERE id = :id", { replacements: { id }, transaction });
+    await transaction.commit();
+    return res.json({ success: true, message: "Custom role deleted." });
   } catch (error) {
     if (!transaction.finished) await transaction.rollback();
     return next(error);

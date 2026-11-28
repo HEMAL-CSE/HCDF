@@ -1,14 +1,16 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  BadgeCheck, ChevronRight, LayoutDashboard, LayoutTemplate, LogOut, Menu, ShieldCheck, UserCheck, UserRound, Users, X
+  BadgeCheck, ChevronRight, FileText, LayoutDashboard, LayoutTemplate, LogOut, Menu, ShieldCheck, UserCheck, UserRound, Users, Wallet, X
 } from "lucide-react";
 import { useState } from "react";
-import { useAuth } from "../context/AuthContext.jsx";
+import { isStaffUser, useAuth } from "../context/AuthContext.jsx";
 
 const links = [
-  { to: "/", label: "Overview", icon: LayoutDashboard, permission: "users.view", end: true },
+  { to: "/", label: "Overview", icon: LayoutDashboard, staffOnly: true, end: true },
   { to: "/member", label: "Member portal", icon: UserRound, permission: "profile.view_own" },
   { to: "/members/approval", label: "Member approval", icon: UserCheck, permission: "membership.view" },
+  { to: "/finance", label: "Finance & donations", icon: Wallet, anyPermission: ["finance.view", "donations.view"] },
+  { to: "/audit", label: "Audit & reports", icon: FileText, anyPermission: ["audit.view", "reports.view"] },
   { to: "/cms", label: "Home content", icon: LayoutTemplate, roles: ["SA", "AD"] },
   { to: "/users", label: "User management", icon: Users, permission: "users.view" },
   { to: "/roles", label: "Roles", icon: ShieldCheck, permission: "roles.view" },
@@ -16,13 +18,13 @@ const links = [
 ];
 
 export default function AppLayout() {
-  const { user, logout, hasPermission, hasAnyRole } = useAuth();
+  const { user, logout, hasPermission, hasAnyPermission, hasAnyRole } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const sectionTitle = location.pathname.startsWith("/member") && !location.pathname.startsWith("/members")
     ? "Member Portal"
-    : "Administration";
+    : "Workspace";
 
   async function handleLogout() {
     await logout();
@@ -43,7 +45,12 @@ export default function AppLayout() {
         <div className="sidebar-section-label">WORKSPACE</div>
         <nav className="side-nav">
           {links
-            .filter((link) => (!link.permission || hasPermission(link.permission)) && (!link.roles || hasAnyRole(...link.roles)))
+            .filter((link) => (
+              (!link.staffOnly || isStaffUser(user)) &&
+              (!link.permission || hasPermission(link.permission)) &&
+              (!link.anyPermission || hasAnyPermission(...link.anyPermission)) &&
+              (!link.roles || hasAnyRole(...link.roles))
+            ))
             .map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} onClick={() => setMobileOpen(false)} className={({ isActive }) => `nav-link ${isActive ? "nav-link-active" : ""}`}>
               <Icon size={18} strokeWidth={1.9} /><span>{label}</span><ChevronRight className="nav-chevron" size={15} />
@@ -66,7 +73,7 @@ export default function AppLayout() {
           </div>
         </header>
         <main className="content-area"><Outlet /></main>
-        <footer className="app-footer"><span>Human Charity Dignity Foundation</span><span>Administration portal</span></footer>
+        <footer className="app-footer"><span>Human Charity Dignity Foundation</span><span>Management portal</span></footer>
       </div>
     </div>
   );
