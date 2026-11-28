@@ -88,26 +88,15 @@ export default function PublicLayout({
 
   return (
     <div className="landing-root">
-      {/* ── TOP UTILITY BAR (LIVE DATE/TIME ON LEFT) ───────────────── */}
+      {/* ── TOP UTILITY BAR · ORG NAME LEFT · LIVE CLOCK RIGHT ──── */}
       {showUtilityBar && (
         <div className="hcdf-utility-bar">
           <div className="hcdf-container hcdf-utility-inner">
+            <span className="hcdf-utility-org">{copy.brandFull}</span>
             <span className="hcdf-utility-clock" aria-live="polite">
               <Clock size={13} />
               <span>{formattedDateTime}</span>
             </span>
-            <div className="hcdf-utility-links">
-              <span className="hcdf-utility-org">{copy.brandFull}</span>
-              {user ? (
-                <Link to={getDefaultRoute(user)} className="hcdf-utility-link">
-                  {copy.workspace} <ArrowRight size={13} />
-                </Link>
-              ) : (
-                <Link to="/login" className="hcdf-utility-link">
-                  {copy.staffPortal}
-                </Link>
-              )}
-            </div>
           </div>
         </div>
       )}
